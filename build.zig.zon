@@ -1,0 +1,19 @@
+.{
+    .name = "fftw3-zig-build",
+    .version = "0.0.0",
+    //.minimum_zig_version = "0.12.0",
+
+    .dependencies = .{
+        .fftw3 = .{
+            .url = "https://www.fftw.org/fftw-3.3.10.tar.gz",
+            .hash = "12207e6b4c8e1dfbbe050b61ff3efcfb32faee3408a01e9b1358a0268327557b57d5",
+        },
+    },
+    .paths = .{
+        "",
+        "build.zig",
+        "build.zig.zon",
+        "LICENSE",
+        //"README.md",
+    },
+}
