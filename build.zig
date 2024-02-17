@@ -4,6 +4,45 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // Project configure options
+    const enable_shared = b.option(bool, "enable-shared", "Create a shared lib instead of a static lib. Default: false") orelse false;
+    _ = enable_shared;
+    const enable_float = b.option(bool, "enable-float", "Enable single precision instead of default double precision. Default: false") orelse false;
+    const enable_long_double = b.option(bool, "enable-long-double", "Enable long double precision instead of default double precision. Default: false") orelse false;
+    const enable_quad_precision = b.option(bool, "enable-quad-precision", "Enable quad precision using the __float128 type instead of default double precision. Default: false") orelse false;
+    const enable_threads = b.option(bool, "enable-threads", "Enable compilation of a separate FFTW3 threads library. Default: false") orelse false;
+    _ = enable_threads;
+    const enable_openmp = b.option(bool, "enable-openmp", "Like -Denable-threads, but uses OpenMP for multiparallelism in main lib. Default: false") orelse false;
+    _ = enable_openmp;
+    const with_combined_threads = b.option(bool, "with-combined-threads", "Enable threads in the main FFTW3 library. Default: false") orelse false;
+    _ = with_combined_threads;
+    const enable_mpi = b.option(bool, "enable-mpi", "Enable compilation of the FFTW3 MPI library.") orelse false;
+    _ = enable_mpi;
+    const disable_fortran = b.option(bool, "disable-fortran", "Disables inclusion of legacy Fortran wrappers. Default: true") orelse true;
+    _ = disable_fortran;
+    const with_g77_wrappers = b.option(bool, "with-g77-wrappers", "Enables wrappers compatible with the g77 compiler. Default: false") orelse false;
+    _ = with_g77_wrappers;
+    const with_slow_timer = b.option(bool, "with-slow-timer", "Disables the use of cycle counters. Generally should not be used. Default: false") orelse false;
+    _ = with_slow_timer;
+
+    // SIMD options
+    //const enable_sse
+    //const enable_sse2
+    //const enable_avx
+    //const enable_avx2
+    //const enable_avx512
+    //const enable_avx128_fma
+    //const enable_kcvi
+    //const enable_altivec
+    //const enable_vsx
+    //const enable_neon
+    //const enable_generic_simd128
+    //const enable_generic_simd256
+
+    if (enable_float and enable_long_double) @panic("-Denable-float and -Denable-long-double cannot both be enabled.");
+    if (enable_float and enable_quad_precision) @panic("-Denable-float and -Denable-quad-precision cannot both be enabled.");
+    if (enable_long_double and enable_quad_precision) @panic("-Denable-long-double and -Denable-quad-precision cannot both be enabled.");
+
     const fftw3_lib = b.dependency("fftw3", .{});
     const fftw3_config_h_template = fftw3_lib.path("config.h.in");
     _ = fftw3_config_h_template;
@@ -27,6 +66,38 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
+}
+
+const Features = struct {
+    has_sse: bool = false,
+    has_sse2: bool = false,
+    has_avx: bool = false,
+    has_avx2: bool = false,
+    has_avx512: bool = false,
+    has_avx128_fma: bool = false,
+    has_kcvi: bool = false,
+    has_altivec: bool = false,
+    has_vsx: bool = false,
+    has_neon: bool = false,
+    has_generic_simd128: bool = false,
+    has_generic_simd256: bool = false,
+};
+fn detectSIMDFeatures(target: std.Target) Features {
+    const features = target.cpu.features;
+    return .{
+        .has_sse = features.featureSetHas(.sse),
+        .has_sse2 = features.featureSetHas(.sse2),
+        .has_avx = features.featureSetHas(.avx),
+        .has_avx2 = features.featureSetHas(.avx2),
+        .has_avx512 = features.featureSetHas(.avx512),
+        .has_avx128_fma = features.featureSetHas(.avx128_fma),
+        .has_kcvi = features.featureSetHas(.kcvi),
+        .has_altivec = features.featureSetHas(.altivec),
+        .has_vsx = features.featureSetHas(.vsx),
+        .has_neon = features.featureSetHas(.neon),
+        .has_generic_simd128 = false, // TODO: detectable?
+        .has_generic_simd256 = false, // TODO: detectable?
+    };
 }
 
 // TODO: Update these to be more portable
@@ -169,4 +240,10 @@ const FFTW3ConfigOptions = struct {
     size_t: ConfigHeader.Value = .{.undef},
     uint32_t: ConfigHeader.Value = .{.undef},
     uint64_t: ConfigHeader.Value = .{.undef},
+
+    pub fn init(target: std.Target) FFTW3ConfigOptions {
+        _ = target;
+        var options = FFTW3ConfigOptions{};
+        return options;
+    }
 };
