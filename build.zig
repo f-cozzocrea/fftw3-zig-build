@@ -47,14 +47,14 @@ pub fn build(b: *std.Build) void {
     const fftw3_config_h_template = fftw3_lib.path("config.h.in");
     _ = fftw3_config_h_template;
 
-    const lib = b.addDynamicLibrary(.{
+    const dylib = b.addDynamicLibrary(.{
         .name = "fftw3-zig-build",
         .root_source_file = .{ .path = "src/root.zig" },
         .target = target,
         .optimize = optimize,
     });
 
-    b.installArtifact(lib);
+    b.installArtifact(dylib);
 
     const lib_unit_tests = b.addTest(.{
         .root_source_file = .{ .path = "src/root.zig" },
@@ -66,38 +66,6 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
-}
-
-const Features = struct {
-    has_sse: bool = false,
-    has_sse2: bool = false,
-    has_avx: bool = false,
-    has_avx2: bool = false,
-    has_avx512: bool = false,
-    has_avx128_fma: bool = false,
-    has_kcvi: bool = false,
-    has_altivec: bool = false,
-    has_vsx: bool = false,
-    has_neon: bool = false,
-    has_generic_simd128: bool = false,
-    has_generic_simd256: bool = false,
-};
-fn detectSIMDFeatures(target: std.Target) Features {
-    const features = target.cpu.features;
-    return .{
-        .has_sse = features.featureSetHas(.sse),
-        .has_sse2 = features.featureSetHas(.sse2),
-        .has_avx = features.featureSetHas(.avx),
-        .has_avx2 = features.featureSetHas(.avx2),
-        .has_avx512 = features.featureSetHas(.avx512),
-        .has_avx128_fma = features.featureSetHas(.avx128_fma),
-        .has_kcvi = features.featureSetHas(.kcvi),
-        .has_altivec = features.featureSetHas(.altivec),
-        .has_vsx = features.featureSetHas(.vsx),
-        .has_neon = features.featureSetHas(.neon),
-        .has_generic_simd128 = false, // TODO: detectable?
-        .has_generic_simd256 = false, // TODO: detectable?
-    };
 }
 
 // TODO: Update these to be more portable
@@ -121,20 +89,20 @@ const FFTW3ConfigOptions = struct {
     FFTW_LDOUBLE: ConfigHeader.Value = .{.undef},
     FFTW_QUAD: ConfigHeader.Value = .{.undef},
     FFTW_RANDOM_ESTIMATOR: ConfigHeader.Value,
-    FFTW_SINGLE: ConfigHeader.Value = .{.undef},
+    FFTW_SINGLE: ConfigHeader.Value,
     HAVE_ABORT: ConfigHeader.Value = .{ .ident = "1" },
     HAVE_ALLOCA: ConfigHeader.Value = .{ .ident = "1" },
     HAVE_ALLOCA_H: ConfigHeader.Value = .{ .ident = "1" },
-    HAVE_ALTIVEC: ConfigHeader.Value = .{.undef},
-    HAVE_ALTIVEC_H: ConfigHeader.Value = .{.undef},
+    HAVE_ALTIVEC: ConfigHeader.Value,
+    HAVE_ALTIVEC_H: ConfigHeader.Value,
     HAVE_ARMV7A_CNTVCT: ConfigHeader.Value = .{.undef},
     HAVE_ARMV7A_PMCCNTR: ConfigHeader.Value = .{.undef},
     HAVE_ARMV8_CNTVCT_EL0: ConfigHeader.Value = .{.undef},
     HAVE_ARMV8_PMCCNTR_EL0: ConfigHeader.Value = .{.undef},
-    HAVE_AVX: ConfigHeader.Value = .{.undef},
-    HAVE_AVX2: ConfigHeader.Value = .{.undef},
-    HAVE_AVX512: ConfigHeader.Value = .{.undef},
-    HAVE_AVX_128_FMA: ConfigHeader.Value = .{.undef},
+    HAVE_AVX: ConfigHeader.Value,
+    HAVE_AVX2: ConfigHeader.Value,
+    HAVE_AVX512: ConfigHeader.Value,
+    HAVE_AVX_128_FMA: ConfigHeader.Value,
     HAVE_BSDGETTIMEOFDAY: ConfigHeader.Value = .{.undef},
     HAVE_CLOCK_GETTIME: ConfigHeader.Value = .{ .ident = "1" },
     HAVE_COSL: ConfigHeader.Value = .{ .ident = "1" },
@@ -151,8 +119,8 @@ const FFTW3ConfigOptions = struct {
     HAVE_DRAND48: ConfigHeader.Value = .{ .ident = "1" },
     HAVE_FCNTL_H: ConfigHeader.Value = .{ .ident = "1" },
     HAVE_FENV_H: ConfigHeader.Value = .{ .ident = "1" },
-    HAVE_GENERIC_SIMD128: ConfigHeader.Value = .{.undef},
-    HAVE_GENERIC_SIMD256: ConfigHeader.Value = .{.undef},
+    HAVE_GENERIC_SIMD128: ConfigHeader.Value,
+    HAVE_GENERIC_SIMD256: ConfigHeader.Value,
     HAVE_GETHRTIME: ConfigHeader.Value = .{.undef},
     HAVE_GETPAGESIZE: ConfigHeader.Value = .{ .ident = "1" },
     HAVE_GETTIMEOFDAY: ConfigHeader.Value = .{ .ident = "1" },
@@ -241,9 +209,91 @@ const FFTW3ConfigOptions = struct {
     uint32_t: ConfigHeader.Value = .{.undef},
     uint64_t: ConfigHeader.Value = .{.undef},
 
-    pub fn init(target: std.Target) FFTW3ConfigOptions {
-        _ = target;
-        var options = FFTW3ConfigOptions{};
-        return options;
+    pub const ConfigOptions = struct {
+        enable_shared: bool,
+        enable_float: bool,
+        enable_long_double: bool,
+        enable_quad_precision: bool,
+        enable_threads: bool,
+        enable_openmp: bool,
+        with_combined_threads: bool,
+        enable_mpi: bool,
+        disable_fortran: bool,
+        with_g77_wrappers: bool,
+        with_slow_timer: bool,
+        enable_sse: ?bool,
+        enable_sse2: ?bool,
+        enable_avx: ?bool,
+        enable_avx2: ?bool,
+        enable_avx512: ?bool,
+        enable_avx128_fma: ?bool,
+        enable_kcvi: ?bool,
+        enable_altivec: ?bool,
+        enable_vsx: ?bool,
+        enable_neon: ?bool,
+        enable_generic_simd128: ?bool,
+        enable_generic_simd256: ?bool,
+    };
+    pub fn init(user_config: ConfigOptions, target: std.Target, optimize: std.builtin.OptimizeMode) FFTW3ConfigOptions {
+        _ = user_config;
+        const features = SIMDFeatures.detect(target);
+        _ = features;
+        const is_debug = optimize == .Debug;
+        return FFTW3ConfigOptions{
+            .FFTW_DEBUG = if (is_debug) .{.defined} else .{.undef},
+            .FFTW_RANDOM_ESTIMATOR = if (is_debug) .{.defined} else .{.undef},
+            //.HAVE_ALTIVEC,
+            //.HAVE_ALTIVEC_H,
+            //.HAVE_AVX,
+            //.HAVE_AVX2,
+            //.HAVE_AVX512,
+            //.HAVE_AVX_128_FMA,
+            //.HAVE_GENERIC_SIMD128,
+            //.HAVE_GENERIC_SIMD256,
+            .SIZEOF_DOUBLE = target.c_type_byte_size(.double),
+            //.SIZEOF_FFTW_R2R_KIND, //FIXME
+            .SIZEOF_FLOAT = target.c_type_byte_size(.float),
+            .SIZEOF_INT = target.c_type_byte_size(.int),
+            .SIZEOF_LONG = target.c_type_byte_size(.long),
+            .SIZEOF_LONG_LONG = target.c_type_byte_size(.longlong),
+            //.SIZEOF_PTRDIFF_T = target.c_type_byte_size(),
+            //.SIZEOF_SIZE_T = target.c_type_byte_size(),
+            .SIZEOF_UNSIGNED_INT = target.c_type_byte_size(.uint),
+            .SIZEOF_UNSIGNED_LONG = target.c_type_byte_size(.ulong),
+            .SIZEOF_UNSIGNED_LONG_LONG = target.c_type_byte_size(.ulonglong),
+        };
     }
+
+    const SIMDFeatures = struct {
+        has_sse: bool = false,
+        has_sse2: bool = false,
+        has_avx: bool = false,
+        has_avx2: bool = false,
+        has_avx512: bool = false,
+        has_avx128_fma: bool = false,
+        has_kcvi: bool = false,
+        has_altivec: bool = false,
+        has_vsx: bool = false,
+        has_neon: bool = false,
+        has_generic_simd128: bool = false,
+        has_generic_simd256: bool = false,
+
+        fn detect(target: std.Target) SIMDFeatures {
+            const features = target.cpu.features;
+            return .{
+                .has_sse = features.featureSetHas(.sse),
+                .has_sse2 = features.featureSetHas(.sse2),
+                .has_avx = features.featureSetHas(.avx),
+                .has_avx2 = features.featureSetHas(.avx2),
+                .has_avx512 = features.featureSetHas(.avx512f),
+                .has_avx128_fma = features.featureSetHas(.fma4),
+                .has_kcvi = false, // TODO: detectable?
+                .has_altivec = features.featureSetHas(.altivec),
+                .has_vsx = features.featureSetHas(.vsx),
+                .has_neon = features.featureSetHas(.neon),
+                .has_generic_simd128 = true, // TODO: detectable?
+                .has_generic_simd256 = true, // TODO: detectable?
+            };
+        }
+    };
 };
